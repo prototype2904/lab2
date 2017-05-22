@@ -3,6 +3,14 @@ import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
 import org.opencv.features2d.FastFeatureDetector;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
 import static org.opencv.calib3d.Calib3d.findHomography;
 import static org.opencv.features2d.DescriptorExtractor.BRISK;
 import static org.opencv.features2d.DescriptorMatcher.BRUTEFORCE;
@@ -17,9 +25,11 @@ public class Main {
 
     public static void main(String[] args) {
         System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-        imwrite("output.png",
-                doo(imread(Main.class.getResource("PNG/1_1.jpg").getPath()),
-                        imread(Main.class.getResource("PNG/1_2.jpg").getPath()), 2.5));
+        imwrite("out.png",
+                doo(imread(Main.class.getResource("PNG/output.png").getPath()),
+                        imread(Main.class.getResource("PNG/3.png").getPath()), 0.2));
+
+
     }
 
     static Mat doo(Mat image2, Mat image1, double f){
@@ -72,7 +82,7 @@ public class Main {
         MatOfDMatch good_matches = new MatOfDMatch();
         for( int i = 0; i < descriptors_object.rows(); i++ )
         {
-            if( dMatches[i].distance < 3 *min_dist){
+            if( dMatches[i].distance < max_dist * f){
                 good_matches.push_back(new MatOfDMatch(dMatches[i]));
             }
         }
@@ -88,11 +98,51 @@ public class Main {
 
 // Find the Homography Matrix
         Mat H = findHomography( obj, scene);
+        writeMatToFile("1", H);
         // Use the Homography Matrix to warp the images
+        System.out.println();
         Mat result = new Mat();
         warpPerspective(image1,result,H, new Size(image1.cols() + image2.cols(), image1.rows()));
         Mat half = new Mat(result, new Rect(0,0, image2.cols(), image2.rows()));
+        List<Point> list = new ArrayList<Point>();
+        for(int i = 0; i < result.cols(); i++){
+            int a = 0;
+            for(int j = 0; j < result.rows(); j++){
+                double[] doubles = result.get(j, i);
+                if (Arrays.equals(doubles, new double[]{0, 0, 0})){
+                    a++;
+                }
+            }
+            if((double)a <= result.rows() * 0.8d){
+                for(int j = 0; j < result.rows(); j++){
+                    list.add(new Point(j,i));
+                }
+            }
+        }
         image2.copyTo(half);
-        return result;
+        MatOfPoint matOfPoint = new MatOfPoint(list.toArray(new Point[list.size()]));
+        Rect rect = boundingRect(matOfPoint);
+        return  result;
     }
+    private static void writeMatToFile(String numberFile, Mat mat){
+        try {
+            FileOutputStream fileOutputStream = new FileOutputStream(new File("chess_0"+numberFile+".txt"));
+            StringBuilder stringBuilder = new StringBuilder();
+            int i = 0;
+            for(int r = 0; r < mat.rows(); r++){
+                for(int c = 0; c < mat.cols(); c++){
+                    stringBuilder.append(i++).append(" ").append(Arrays.toString(mat.get(r,c))).append(",");
+                }
+                if(r != mat.cols() -1)
+                    stringBuilder.append("\n");
+            }
+            fileOutputStream.write(stringBuilder.toString().getBytes());
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+  //  0<= _rowRange.start && _rowRange.start <= _rowRange.end && _rowRange.end <= m.rows
 }
